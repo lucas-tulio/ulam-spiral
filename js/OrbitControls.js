@@ -251,8 +251,8 @@ THREE.OrbitControls = function ( object, domElement ) {
 
 		}
 
-		theta += thetaDelta / 20;
-		phi += phiDelta / 20;
+		theta = 0;
+		phi = 0;
 
 		// restrict phi to be between desired limits
 		phi = Math.max( this.minPolarAngle, Math.min( this.maxPolarAngle, phi ) );
@@ -323,21 +323,14 @@ THREE.OrbitControls = function ( object, domElement ) {
 		if ( scope.enabled === false ) return;
 		event.preventDefault();
 
-		if ( event.button === 0 ) {
-			if ( scope.noRotate === true ) return;
-
-			state = STATE.ROTATE;
-
-			rotateStart.set( event.clientX, event.clientY );
-
-		} else if ( event.button === 1 ) {
+		if ( event.button === 1 ) {
 			if ( scope.noZoom === true ) return;
 
 			state = STATE.DOLLY;
 
 			dollyStart.set( event.clientX, event.clientY );
 
-		} else if ( event.button === 2 ) {
+		} else if ( event.button === 2 || event.button === 0) {
 			if ( scope.noPan === true ) return;
 
 			state = STATE.PAN;
