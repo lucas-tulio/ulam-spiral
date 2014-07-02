@@ -3,4 +3,4 @@ Ulam Spiral
 
 A silly way to view prime numbers.
 
-[Try it live here](lucasdnd.github.io/ulam-spiral)
+[Try it live here](http://lucasdnd.github.io/ulam-spiral)
