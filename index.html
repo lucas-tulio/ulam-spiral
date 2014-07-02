@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>Ulam Spiral Viewer</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				background-color: #ffffff;
+				margin: 0px;
+				overflow: hidden;
+				color: #fff;
+				font-family: helvetica, sans-serif;
+			}
+
+			a {
+				color:#0078ff;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="message"></div>
+		<div id="container"></div>
+		<script src="js/three.min.js"></script>
+		<script src="js/OrbitControls.js"></script>
+		<script src="js/Detector.js"></script>
+
+		<script type="x-shader/x-vertex" id="vertexshader">
+
+			attribute float size;
+			attribute vec3 ca;
+
+			varying vec3 vColor;
+
+			void main() {
+
+				vColor = ca;
+
+				vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
+
+				gl_PointSize = size;
+				gl_PointSize = size * ( 100.0 / length( mvPosition.xyz ) );
+
+				gl_Position = projectionMatrix * mvPosition;
+
+			}
+
+		</script>
+
+		<script type="x-shader/x-fragment" id="fragmentshader">
+
+			uniform vec3 color;
+			uniform sampler2D texture;
+
+			varying vec3 vColor;
+
+			void main() {
+
+				gl_FragColor = vec4( color * vColor, 1.0 );
+				gl_FragColor = gl_FragColor * texture2D( texture, gl_PointCoord );
+
+			}
+
+		</script>
+
+		<script>
+
+			var mouseX = 0, mouseY = 0,
+
+			windowHalfX = window.innerWidth / 2,
+			windowHalfY = window.innerHeight / 2,
+
+			camera, scene, renderer, particleSystem;
+
+			init();
+			animate();
+
+			function init() {
+
+				var container = document.createElement('div');
+				document.body.appendChild(container);
+
+				camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 10000 );
+				camera.position.y = 6;
+
+				controls = new THREE.OrbitControls( camera );
+				controls.addEventListener( 'change', render );
+
+				scene = new THREE.Scene();
+				
+				renderer = Detector.webgl? new THREE.WebGLRenderer({alpha: true}): document.getElementById("message").textContent = "Your browser does not support WebGL.";
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.setClearColor( 0xffffff, 1);
+				container.appendChild( renderer.domElement );
+
+				// Generate the point texture
+				var pointTexture = new THREE.Texture(generatePointTexture());
+				pointTexture.needsUpdate = true;
+
+				// Set up the shaders
+				attributes = {
+					size: {	type: 'f', value: [] },
+					ca:   {	type: 'c', value: [] }
+				};
+
+				uniforms = {
+					amplitude: { type: "f", value: 1.0 },
+					color:     { type: "c", value: new THREE.Color( 0xffffff ) },
+					texture:   { type: "t", value: pointTexture },
+				};
+
+				uniforms.texture.value.wrapS = uniforms.texture.value.wrapT = THREE.RepeatWrapping;
+
+				var shaderMaterial = new THREE.ShaderMaterial( {
+					uniforms: 		uniforms,
+					attributes:     attributes,
+					vertexShader:   document.getElementById( 'vertexshader' ).textContent,
+					fragmentShader: document.getElementById( 'fragmentshader' ).textContent,
+					transparent:	true
+				});
+
+				// Spiral properties
+				var primes = new THREE.Geometry();
+				var points = 100000;
+				var pointSize = 0.08;
+
+				// Create the spiral structure
+				var num = 1;
+				var segment = 0;		// First segment going right (numbers 1 and 2)
+				var numInSegment = 1;	// First number in the segment
+				var segmentSize = 1;	// First segment is size 2
+				var direction = 0;
+				RIGHT = 0;
+				UP = 1;
+				LEFT = 2;
+				DOWN = 3;
+		
+				// Set the starting points (middle of the screen)
+				var currentX = 0;
+				var currentZ = 0;
+				do {
+
+					// Add it!
+					if(isPrime(num)) {
+						var x = currentX * pointSize;
+						var y = 0;
+						var z = currentZ * pointSize;
+						primes.vertices.push(new THREE.Vector3(x, y, z));
+					}
+
+					// Check if we reached the end of a segment
+					if(numInSegment > segmentSize) {
+						
+						// Change direction
+						direction = changeDirection(direction);
+						
+						// Reset the current num in segment
+						numInSegment = 1;
+						
+						// Go to the next segment
+						if(segment == 0) {
+							segment++;
+						} else {// if (segment == 1) {
+							
+							// Reset the segment indicator and update its size
+							segment = 0;
+							segmentSize++;
+						}	
+					}
+					// Next num
+					num++;
+					
+					// Move to the next position
+					numInSegment++;
+					
+					// Update coordinates 
+					newCoords = updateCoords(direction, currentX, currentZ);
+					currentX = newCoords.x;
+					currentZ = newCoords.z;
+
+				} while(num < points);
+
+				// Create the particle system
+				var numPrimesVertices = primes.vertices.length;
+				particleSystem = new THREE.ParticleSystem(primes, shaderMaterial);
+				particleSystem.sortParticles = true;
+				
+				// Data to send to the shader
+				var vertices = particleSystem.geometry.vertices;
+				var values_size = attributes.size.value;
+				var values_color = attributes.ca.value;
+
+				// Color and size variation
+				for( var v = 0; v < vertices.length; v++ ) {
+					if(v < numPrimesVertices) {
+						values_size[ v ] = 0.5;
+						values_color[ v ] = new THREE.Color( 0xffffff );
+						values_color[ v ].setRGB(0, 0, 0);
+					} else {
+						values_size[ v ] = 0.5;
+						values_color[ v ] = new THREE.Color( 0xffffff );
+						values_color[ v ].setRGB(0.5, 0.5, 0.5);
+					}
+				}
+
+				// Add the particle system to the scene
+				scene.add(particleSystem);
+
+				// Resize listener
+				window.addEventListener( 'resize', onWindowResize, false );
+			}
+
+			function generatePointTexture() {
+
+				// Create a canvas
+				var canvas = document.createElement('canvas');
+				var size = 64;
+				canvas.width = size;
+				canvas.height = size;
+
+				// Get the context
+				var context = canvas.getContext('2d');
+
+				// Draw!
+				var centerX = size / 2;
+				var centerY = size / 2;
+				var radius = size / 2;
+
+				for(var i = 1; i < 33; i++) {
+					context.beginPath();
+					context.arc(centerX, centerY, (radius / 2) + (i / 2), 0, 2 * Math.PI, false);
+					if(i >= 28) {
+						context.fillStyle = "rgba(255, 255, 255, 0.1)"; 
+					} else {
+						context.fillStyle = "rgba(255, 255, 255, 1)"; 
+					}
+					
+					context.fill();
+				}
+
+				return canvas;
+			}
+
+			function isPrime(num) {
+				if(num == 1) return true;
+				for (var i = 2; i < num; i++) {
+					if (num % i == 0) {
+						return false;
+					}
+				}
+				return true;
+			}
+			function changeDirection(direction) {
+				direction++;
+				if(direction > 3) {
+					direction = 0;
+				}
+				return direction
+			}
+			function updateCoords(direction, currentX, currentZ) {
+				if(direction == RIGHT) {
+					currentX++;
+				} else if (direction == UP) {
+					currentZ--;
+				} else if (direction == LEFT) {
+					currentX--;
+				} else { //if (direction == DOWN) {
+					currentZ++;
+				}
+
+				return {x: currentX, z: currentZ};
+			}
+
+			function onWindowResize() {
+
+				windowHalfX = window.innerWidth / 2;
+				windowHalfY = window.innerHeight / 2;
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+			}
+
+			function animate() {
+				controls.update();
+				requestAnimationFrame( animate );
+				render();
+			}
+
+			function render() {
+				// camera.lookAt(scene.position);
+				renderer.render( scene, camera );
+
+			}
+
+			function rand() {
+				return Math.random() - 0.5;
+			}
+
+		</script>
+
+	</body>
+</html>
