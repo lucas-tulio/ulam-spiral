@@ -9,7 +9,7 @@
 				background-color: #ffffff;
 				margin: 0px;
 				overflow: hidden;
-				color: #fff;
+				color: #000;
 				font-family: helvetica, sans-serif;
 			}
 
@@ -19,7 +19,7 @@
 		</style>
 	</head>
 	<body>
-		<div id="message"></div>
+		<div id="message"><p align="center" style="color: #000;">Loading...</p></div>
 		<div id="container"></div>
 		<script src="js/three.min.js"></script>
 		<script src="js/OrbitControls.js"></script>
@@ -88,10 +88,14 @@
 
 				scene = new THREE.Scene();
 				
-				renderer = Detector.webgl? new THREE.WebGLRenderer({alpha: true}): document.getElementById("message").textContent = "Your browser does not support WebGL.";
+				var messageContainer = document.getElementById("message");
+				renderer = Detector.webgl? new THREE.WebGLRenderer({alpha: true}): messageContainer.textContent = "Your browser does not support WebGL.";
+				
 				renderer.setSize( window.innerWidth, window.innerHeight );
 				renderer.setClearColor( 0xffffff, 1);
 				container.appendChild( renderer.domElement );
+
+				messageContainer.textContent = "";
 
 				// Generate the point texture
 				var pointTexture = new THREE.Texture(generatePointTexture());
